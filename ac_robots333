@@ -1,27 +1,28 @@
 blueprint:
-  name: EcoMain - PV Controlled Air Conditioner 333
+  name: Solar Surplus Air Conditioner Control
   description: >
-    Automatically control an air conditioner using ADAPROX Fingerbots
-    according to EcoMain real-time power.
+    Automatically control an air conditioner using physical button pushers
+    based on household grid power and available solar surplus.
 
     When grid power is below the ON threshold for a period of time,
     the selected Fingerbot actions are executed.
 
     When grid power is above the OFF threshold for a period of time,
     another set of Fingerbot actions are executed.
+    
+    This blueprint is designed for Home Assistant users.
 
-    This blueprint is designed for EcoMain users.
   domain: automation
 
   input:
     power_sensor:
-      name: EcoMain Grid Power Sensor
+      name: Grid Power Sensor
       selector:
         entity:
           domain: sensor
 
     on_threshold:
-      name: PV Available Threshold (W)
+      name: Surplus Export Threshold (W)
       default: -500
       selector:
         number:
@@ -51,27 +52,27 @@ blueprint:
           unit_of_measurement: seconds
 
     power_button:
-      name: Power Fingerbot
+      name: Power Button
       selector:
         entity:
           domain: switch
 
     temp_up_button:
-      name: Temperature Up Fingerbot
+      name: Temperature Up Button
       selector:
         entity:
           domain: switch
           multiple: false
 
     temp_down_button:
-      name: Temperature Down Fingerbot
+      name: Temperature Down Button
       selector:
         entity:
           domain: switch
           multiple: false
 
     power_on:
-      name: Press Power when PV is available
+      name: Turn on AC when solar surplus is available
       default: true
       selector:
         boolean:
@@ -86,7 +87,7 @@ blueprint:
           step: 1
 
     power_off:
-      name: Press Power when PV disappears
+      name: Turn off AC when grid import is detected
       default: true
       selector:
         boolean:
@@ -129,7 +130,7 @@ action:
 
   - choose:
 
-      # PV Available
+      # Solar Surplus Available
       - conditions:
           - condition: trigger
             id: pv_on
@@ -157,7 +158,7 @@ action:
                       target:
                         entity_id: "{{ temp_down_entity }}"
 
-      # PV Not Available
+      # Grid Import
       - conditions:
           - condition: trigger
             id: pv_off
