@@ -134,6 +134,7 @@ action:
       - conditions:
           - condition: trigger
             id: pv_on
+
         sequence:
 
           # Optionally press Power
@@ -145,6 +146,9 @@ action:
                 target:
                   entity_id: "{{ power_button_entity }}"
 
+              # Wait 5 seconds before temperature adjustment
+              - delay: "00:00:05"
+
           # Optionally lower the temperature
           - if:
               - condition: template
@@ -153,15 +157,19 @@ action:
               - repeat:
                   count: "{{ cool_steps }}"
                   sequence:
-                    - delay: "00:00:02"
                     - service: switch.turn_on
                       target:
                         entity_id: "{{ temp_down_entity }}"
+
+                    # Wait 8 seconds before the next press
+                    - delay: "00:00:08"
+
 
       # Grid Import
       - conditions:
           - condition: trigger
             id: pv_off
+
         sequence:
 
           # Optionally press Power
@@ -173,6 +181,9 @@ action:
                 target:
                   entity_id: "{{ power_button_entity }}"
 
+              # Wait 5 seconds before temperature adjustment
+              - delay: "00:00:05"
+
           # Optionally raise the temperature
           - if:
               - condition: template
@@ -181,7 +192,9 @@ action:
               - repeat:
                   count: "{{ warm_steps }}"
                   sequence:
-                    - delay: "00:00:02"
                     - service: switch.turn_on
                       target:
                         entity_id: "{{ temp_up_entity }}"
+
+                    # Wait 8 seconds before the next press
+                    - delay: "00:00:08"
