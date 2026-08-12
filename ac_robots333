@@ -5,11 +5,11 @@ blueprint:
     based on household grid power and available solar surplus.
 
     When grid power is below the ON threshold for a period of time,
-    the selected Fingerbot actions are executed.
+    the selected actions are executed.
 
     When grid power is above the OFF threshold for a period of time,
-    another set of Fingerbot actions are executed.
-    
+    another set of actions are executed.
+
     This blueprint is designed for Home Assistant users.
 
   domain: automation
@@ -53,23 +53,24 @@ blueprint:
 
     power_button:
       name: Power Button
+      default: []
       selector:
         entity:
           domain: switch
 
     temp_up_button:
       name: Temperature Up Button
+      default: []
       selector:
         entity:
           domain: switch
-          multiple: false
 
     temp_down_button:
       name: Temperature Down Button
+      default: []
       selector:
         entity:
           domain: switch
-          multiple: false
 
     power_on:
       name: Turn on AC when solar surplus is available
@@ -128,6 +129,60 @@ action:
       cool_steps: !input cool_down_steps
       warm_steps: !input warm_up_steps
 
+  # Validate required buttons for the selected actions
+  - choose:
+      - conditions:
+          - condition: template
+            value_template: >
+              {{
+                trigger.id == 'pv_on'
+                and power_on_var == true
+                and power_button_entity in [none, []]
+              }}
+        sequence:
+          - stop: >
+              Power Button is required when
+              "Turn on AC when solar surplus is available" is enabled.
+
+      - conditions:
+          - condition: template
+            value_template: >
+              {{
+                trigger.id == 'pv_off'
+                and power_off_var == true
+                and power_button_entity in [none, []]
+              }}
+        sequence:
+          - stop: >
+              Power Button is required when
+              "Turn off AC when grid import is detected" is enabled.
+
+      - conditions:
+          - condition: template
+            value_template: >
+              {{
+                trigger.id == 'pv_on'
+                and cool_steps | int > 0
+                and temp_down_entity in [none, []]
+              }}
+        sequence:
+          - stop: >
+              Temperature Down Button is required when
+              Temperature Down Presses is greater than 0.
+
+      - conditions:
+          - condition: template
+            value_template: >
+              {{
+                trigger.id == 'pv_off'
+                and warm_steps | int > 0
+                and temp_up_entity in [none, []]
+              }}
+        sequence:
+          - stop: >
+              Temperature Up Button is required when
+              Temperature Up Presses is greater than 0.
+
   - choose:
 
       # Solar Surplus Available
@@ -136,7 +191,6 @@ action:
             id: pv_on
 
         sequence:
-
           # Optionally press Power
           - if:
               - condition: template
@@ -146,24 +200,21 @@ action:
                 target:
                   entity_id: "{{ power_button_entity }}"
 
-              # Wait 5 seconds before temperature adjustment
               - delay: "00:00:05"
 
           # Optionally lower the temperature
           - if:
               - condition: template
-                value_template: "{{ cool_steps > 0 and temp_down_entity is not none }}"
+                value_template: "{{ cool_steps | int > 0 }}"
             then:
               - repeat:
-                  count: "{{ cool_steps }}"
+                  count: "{{ cool_steps | int }}"
                   sequence:
                     - service: switch.turn_on
                       target:
                         entity_id: "{{ temp_down_entity }}"
 
-                    # Wait 8 seconds before the next press
                     - delay: "00:00:08"
-
 
       # Grid Import
       - conditions:
@@ -171,7 +222,6 @@ action:
             id: pv_off
 
         sequence:
-
           # Optionally press Power
           - if:
               - condition: template
@@ -181,20 +231,18 @@ action:
                 target:
                   entity_id: "{{ power_button_entity }}"
 
-              # Wait 5 seconds before temperature adjustment
               - delay: "00:00:05"
 
           # Optionally raise the temperature
           - if:
               - condition: template
-                value_template: "{{ warm_steps > 0 and temp_up_entity is not none }}"
+                value_template: "{{ warm_steps | int > 0 }}"
             then:
               - repeat:
-                  count: "{{ warm_steps }}"
+                  count: "{{ warm_steps | int }}"
                   sequence:
                     - service: switch.turn_on
                       target:
                         entity_id: "{{ temp_up_entity }}"
 
-                    # Wait 8 seconds before the next press
                     - delay: "00:00:08"
