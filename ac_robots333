@@ -102,6 +102,28 @@ blueprint:
           max: 10
           step: 1
 
+    power_delay:
+      name: Delay after Power Button (seconds)
+      description: Wait time before temperature adjustment after pressing power
+      default: 5
+      selector:
+        number:
+          min: 1
+          max: 30
+          step: 1
+          unit_of_measurement: seconds
+
+    temp_press_delay:
+      name: Delay between Temperature Presses (seconds)
+      description: Wait time between each temperature button press
+      default: 8
+      selector:
+        number:
+          min: 1
+          max: 30
+          step: 1
+          unit_of_measurement: seconds
+
 mode: single
 
 trigger:
@@ -128,60 +150,97 @@ action:
       temp_up_entity: !input temp_up_button
       cool_steps: !input cool_down_steps
       warm_steps: !input warm_up_steps
+      power_delay_sec: !input power_delay
+      temp_press_delay_sec: !input temp_press_delay
 
   # Validate required buttons for the selected actions
   - choose:
+
+      # Power Button required for turning on
       - conditions:
           - condition: template
             value_template: >
               {{
                 trigger.id == 'pv_on'
                 and power_on_var == true
-                and power_button_entity in [none, []]
+                and (not power_button_entity or power_button_entity is none)
               }}
         sequence:
+          - service: persistent_notification.create
+            data:
+              title: Solar Surplus Air Conditioner Control
+              message: >
+                Power Button is required when
+                "Turn on AC when solar surplus is available" is enabled.
+
           - stop: >
               Power Button is required when
               "Turn on AC when solar surplus is available" is enabled.
 
+      # Power Button required for turning off
       - conditions:
           - condition: template
             value_template: >
               {{
                 trigger.id == 'pv_off'
                 and power_off_var == true
-                and power_button_entity in [none, []]
+                and (not power_button_entity or power_button_entity is none)
               }}
         sequence:
+          - service: persistent_notification.create
+            data:
+              title: Solar Surplus Air Conditioner Control
+              message: >
+                Power Button is required when
+                "Turn off AC when grid import is detected" is enabled.
+
           - stop: >
               Power Button is required when
               "Turn off AC when grid import is detected" is enabled.
 
+      # Temperature Down Button required
       - conditions:
           - condition: template
             value_template: >
               {{
                 trigger.id == 'pv_on'
                 and cool_steps | int > 0
-                and temp_down_entity in [none, []]
+                and (not temp_down_entity or temp_down_entity is none)
               }}
         sequence:
+          - service: persistent_notification.create
+            data:
+              title: Solar Surplus Air Conditioner Control
+              message: >
+                Temperature Down Button is required when
+                Temperature Down Presses is greater than 0.
+
           - stop: >
               Temperature Down Button is required when
               Temperature Down Presses is greater than 0.
 
+      # Temperature Up Button required
       - conditions:
           - condition: template
             value_template: >
               {{
                 trigger.id == 'pv_off'
                 and warm_steps | int > 0
-                and temp_up_entity in [none, []]
+                and (not temp_up_entity or temp_up_entity is none)
               }}
         sequence:
+          - service: persistent_notification.create
+            data:
+              title: Solar Surplus Air Conditioner Control
+              message: >
+                Temperature Up Button is required when
+                Temperature Up Presses is greater than 0.
+
           - stop: >
               Temperature Up Button is required when
               Temperature Up Presses is greater than 0.
+
+    default: []
 
   - choose:
 
@@ -191,6 +250,7 @@ action:
             id: pv_on
 
         sequence:
+
           # Optionally press Power
           - if:
               - condition: template
@@ -200,7 +260,9 @@ action:
                 target:
                   entity_id: "{{ power_button_entity }}"
 
-              - delay: "00:00:05"
+              # Wait before temperature adjustment
+              - delay:
+                  seconds: "{{ power_delay_sec }}"
 
           # Optionally lower the temperature
           - if:
@@ -214,7 +276,13 @@ action:
                       target:
                         entity_id: "{{ temp_down_entity }}"
 
-                    - delay: "00:00:08"
+                    # Wait before the next press
+                    - if:
+                        - condition: template
+                          value_template: "{{ repeat.index < cool_steps | int }}"
+                      then:
+                        - delay:
+                            seconds: "{{ temp_press_delay_sec }}"
 
       # Grid Import
       - conditions:
@@ -222,6 +290,7 @@ action:
             id: pv_off
 
         sequence:
+
           # Optionally press Power
           - if:
               - condition: template
@@ -231,7 +300,9 @@ action:
                 target:
                   entity_id: "{{ power_button_entity }}"
 
-              - delay: "00:00:05"
+              # Wait before temperature adjustment
+              - delay:
+                  seconds: "{{ power_delay_sec }}"
 
           # Optionally raise the temperature
           - if:
@@ -245,4 +316,10 @@ action:
                       target:
                         entity_id: "{{ temp_up_entity }}"
 
-                    - delay: "00:00:08"
+                    # Wait before the next press (skip after last press)
+                    - if:
+                        - condition: template
+                          value_template: "{{ repeat.index < warm_steps | int }}"
+                      then:
+                        - delay:
+                            seconds: "{{ temp_press_delay_sec }}"
